@@ -3,13 +3,15 @@ import numpy as np
 from PIL import Image
 from numpy import savez_compressed
 
+import config
+
 
 def img_npz():
     # path to the image directory
-    dir_data = "vehicle_ds/images/hatchback"
+    dir_data = config.DATA_DIR
 
     # setting image shape to 32x32
-    img_shape = (32, 32, 3)
+    img_shape = (config.IMG_WIDTH, config.IMG_HEIGHT, 3)
 
     # listing out all file names
     nm_imgs = np.sort(os.listdir(dir_data))
@@ -20,7 +22,7 @@ def img_npz():
         try:
             img = Image.open(dir_data + '/' + file)
             img = img.convert('RGB')
-            img = img.resize((32, 32))
+            img = img.resize((config.IMG_WIDTH, config.IMG_HEIGHT))
             img = np.asarray(img) / 255
             X_train.append(img)
         except:
@@ -30,7 +32,7 @@ def img_npz():
     print("Training image shape : ", X_train.shape)
 
     # save to npy file
-    savez_compressed('hatchback_images_32x32.npz', X_train)
+    savez_compressed(config.NPZ_PTH, X_train)
 
 
 img_npz()

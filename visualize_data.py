@@ -3,7 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # load dict of arrays
-imgs  = np.load('hatchback_images_32x32.npz')
+import config
+
+imgs  = np.load(config.NPZ_PTH)
 
 # extract the first array
 data = imgs['arr_0']
@@ -33,8 +35,8 @@ def plot_images(imgs, grid_size=5):
         fig.add_subplot(rows, columns, i)
         plt.imshow(imgs[i])
     #plt.show()
-    plt.savefig('plots/training_32x32_new.png')
-    #plt.savefig('plots/train_op.png')
+
+    plt.savefig(config.IMG_PTH)
 
 # pls ignore the poor quality of the images as we are working with 256x256 sized images.
 plot_images(imgs['arr_0'], 3)

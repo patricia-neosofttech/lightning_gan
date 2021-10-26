@@ -33,6 +33,14 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+
+## Preprocessing using helper function
+- Use img_to_npz.py file to convert images to numpy array
+- Used plot_imgaes.py to plot fake generated images 
+
+## Configuration
+- Use config.py to make paramerters configurable i.e batch_size, epochs, etc.
+
 ## How to run the code
 - Execute the below command to train the network
 ```bash

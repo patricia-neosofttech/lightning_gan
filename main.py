@@ -3,10 +3,10 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.utils.data import DataLoader
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.trainer import Trainer
+import config
 from ds_class import HatchBackDataset
 from img_to_npz import img_npz
 from visualize_data import imgs, plot_images
@@ -17,11 +17,11 @@ from argparse import ArgumentParser, Namespace
 class BEGAN(LightningModule):
 
     def __init__(self,
-                 latent_dim: int = 100,
-                 lr: float = 0.0002,
-                 b1: float = 0.5,
-                 b2: float = 0.999,
-                 batch_size: int = 64, **kwargs):
+                 latent_dim: int = config.LATENT_DIM,
+                 lr: float = config.LEARNING_RATE,
+                 b1: float = config.B1,
+                 b2: float = config.B2,
+                 batch_size: int = config.BATCH_SIZE, **kwargs):
         super().__init__()
         self.save_hyperparameters()
 
@@ -31,10 +31,11 @@ class BEGAN(LightningModule):
         self.b2 = b2
         self.batch_size = batch_size
 
+
         self.M = 1e+9
 
         # networks
-        img_shape = (3,32,32)
+        img_shape = (3,config.IMG_WIDTH, config.IMG_HEIGHT)
         self.generator = Generator(latent_dim=self.latent_dim, img_shape=img_shape)
         self.discriminator = Discriminator(img_shape=img_shape)
 
@@ -72,6 +73,9 @@ class BEGAN(LightningModule):
 
             # adversarial loss is binary cross-entropy
             fake_imgs = self(z)
+            img_plot = np.transpose(fake_imgs.detach().cpu(), (
+                0, 2, 3, 1))  # .detach().cpu() is imp for copying fake_img tensor to host memory first
+            plot_images(img_plot)
             g_loss = self.adversarial_loss(self.discriminator(fake_imgs), fake_imgs)
             tqdm_dict = {'g_loss': g_loss}
             output = OrderedDict({
@@ -136,7 +140,7 @@ class BEGAN(LightningModule):
 
     def train_dataloader(self):
         transform = transforms.Compose([
-            transforms.Resize((32, 32)),
+            transforms.Resize((config.IMG_WIDTH,config.IMG_HEIGHT)),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ])
@@ -162,8 +166,10 @@ def main(args: Namespace) -> None:
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    
-    trainer = Trainer(gpus=args.gpus,accelerator="ddp", max_epochs=100)
+    # If use distubuted training  PyTorch recommends to use DistributedDataParallel.
+    # See: https://pytorch.org/docs/stable/nn.html#torch.nn.DataParallel
+
+    trainer = Trainer(gpus=args.gpus,accelerator=config.ACCELERATOR, max_epochs=config.EPOCHS)
 
     # ------------------------
     # 3 START TRAINING
@@ -173,15 +179,16 @@ def main(args: Namespace) -> None:
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--gpus", type=int, default=-1, help="number of GPUs")
-    parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-    parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-    parser.add_argument("--b1", type=float, default=0.5,
+    parser.add_argument("--gpus", type=int, default=config.GPUS, help="number of GPUs")
+    parser.add_argument("--batch_size", type=int, default=config.BATCH_SIZE, help="size of the batches")
+    parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="adam: learning rate")
+    parser.add_argument("--b1", type=float, default=config.B1,
                         help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--b2", type=float, default=0.999,
+    parser.add_argument("--b2", type=float, default=config.B2,
                         help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--latent_dim", type=int, default=100,
+    parser.add_argument("--latent_dim", type=int, default=config.LATENT_DIM,
                         help="dimensionality of the latent space")
+
 
 
     hparams = parser.parse_args()
