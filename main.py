@@ -12,6 +12,7 @@ from img_to_npz import img_npz
 from visualize_data import imgs, plot_images
 from model import Generator, Discriminator
 from argparse import ArgumentParser, Namespace
+from pytorch_lightning.loggers import TensorBoardLogger
 
 
 class BEGAN(LightningModule):
@@ -31,11 +32,10 @@ class BEGAN(LightningModule):
         self.b2 = b2
         self.batch_size = batch_size
 
-
         self.M = 1e+9
 
         # networks
-        img_shape = (3,config.IMG_WIDTH, config.IMG_HEIGHT)
+        img_shape = (3, config.IMG_WIDTH, config.IMG_HEIGHT)
         self.generator = Generator(latent_dim=self.latent_dim, img_shape=img_shape)
         self.discriminator = Discriminator(img_shape=img_shape)
 
@@ -83,6 +83,8 @@ class BEGAN(LightningModule):
                 'progress_bar': tqdm_dict,
                 'log': tqdm_dict
             })
+
+            self.logger.experiment.add_scalar("Loss/train/generator_loss", g_loss, self.current_epoch)
             return output
 
         # train discriminator
@@ -112,6 +114,8 @@ class BEGAN(LightningModule):
                 'progress_bar': tqdm_dict,
                 'log': tqdm_dict
             })
+
+            self.logger.experiment.add_scalar("Loss/train/discriminator_loss", d_loss, self.current_epoch)
             return output
 
     def validation_step(self, batch, batch_idx):
@@ -120,7 +124,9 @@ class BEGAN(LightningModule):
         loss = self.loss(logits, y)
         # Add sync_dist=True to sync logging across all GPU workers
         self.log("val_loss", loss, on_step=True, on_epoch=True, sync_dist=True)
-
+        self.logger.experiment.add_scalar("Loss/val", loss, self.current_epoch)
+        epoch_dictionary = {'loss': loss}
+        return epoch_dictionary
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -128,6 +134,9 @@ class BEGAN(LightningModule):
         loss = self.loss(logits, y)
         # Add sync_dist=True to sync logging across all GPU workers
         self.log("test_loss", loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.logger.experiment.add_scalar("Loss/test", loss, self.current_epoch)
+        epoch_dictionary = {'loss': loss}
+        return epoch_dictionary
 
     def configure_optimizers(self):
         lr = self.lr
@@ -140,7 +149,7 @@ class BEGAN(LightningModule):
 
     def train_dataloader(self):
         transform = transforms.Compose([
-            transforms.Resize((config.IMG_WIDTH,config.IMG_HEIGHT)),
+            transforms.Resize((config.IMG_WIDTH, config.IMG_HEIGHT)),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ])
@@ -166,10 +175,9 @@ def main(args: Namespace) -> None:
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    # If use distubuted training  PyTorch recommends to use DistributedDataParallel.
-    # See: https://pytorch.org/docs/stable/nn.html#torch.nn.DataParallel
 
-    trainer = Trainer(gpus=args.gpus,accelerator=config.ACCELERATOR, max_epochs=config.EPOCHS)
+    logger = TensorBoardLogger("tb_logs", name="my_model", log_graph=True)
+    trainer = Trainer(gpus=args.gpus, accelerator=config.ACCELERATOR, max_epochs=config.EPOCHS, logger=logger)
 
     # ------------------------
     # 3 START TRAINING
@@ -188,8 +196,6 @@ if __name__ == '__main__':
                         help="adam: decay of first order momentum of gradient")
     parser.add_argument("--latent_dim", type=int, default=config.LATENT_DIM,
                         help="dimensionality of the latent space")
-
-
 
     hparams = parser.parse_args()
 
